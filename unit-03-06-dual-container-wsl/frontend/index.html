@@ -1,0 +1,140 @@
+<!DOCTYPE html>
+<html lang="zh-CN">
+<head>
+  <meta charset="UTF-8" />
+  <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+  <title>Ai4Energy 双容器实验台 · Vue 3 + Nginx + FastAPI</title>
+  <style>
+    :root { --bg:#f7f9fc; --card:#fff; --ink:#122640; --sub:#475569; --blue:#0a5cc4; --teal:#0f766e; --line:#dce5f0; --red:#dc2626; }
+    * { box-sizing:border-box; font-family:"Source Han Sans CN","Microsoft YaHei",system-ui,sans-serif; }
+    body { margin:0; background:var(--bg); color:var(--ink); padding:28px; }
+    .wrap { max-width:980px; margin:0 auto; }
+    .hero { background:var(--card); border:1px solid var(--line); border-radius:16px; padding:22px 26px; display:flex; justify-content:space-between; align-items:center; box-shadow:0 6px 20px rgba(18,38,64,.06); margin-bottom:20px; }
+    .badge { display:inline-block; background:#e8f1fc; color:var(--blue); padding:5px 12px; border-radius:999px; font-weight:700; font-size:13px; border:1px solid #bfdbfe; }
+    .status-pill { padding:8px 16px; border-radius:999px; font-weight:700; font-size:14px; background:#ecfdf5; color:var(--teal); border:1px solid #99f6e4; }
+    .card { background:var(--card); border:1px solid var(--line); border-radius:16px; padding:22px 26px; box-shadow:0 6px 20px rgba(18,38,64,.05); }
+    .form-row { display:flex; gap:10px; margin-bottom:18px; }
+    input, select { padding:10px 14px; border:1.5px solid #cbd5e1; border-radius:10px; font-size:15px; }
+    input { flex:1; }
+    button.primary { background:var(--blue); color:#fff; border:none; padding:10px 20px; border-radius:10px; font-weight:700; cursor:pointer; font-size:15px; }
+    button.primary:hover { background:#08499e; }
+    .list { display:flex; flex-direction:column; gap:10px; }
+    .item { display:flex; align-items:center; justify-content:space-between; padding:12px 16px; border:1px solid var(--line); border-radius:12px; background:#fafcff; }
+    .item.done span.ttl { text-decoration:line-through; color:var(--sub); }
+    .cat { font-size:12px; background:#eff6ff; color:var(--blue); padding:3px 10px; border-radius:999px; margin-right:10px; font-weight:700; }
+    .actions button { border:none; border-radius:8px; padding:6px 12px; cursor:pointer; font-weight:700; margin-left:6px; }
+    .btn-ok { background:#ecfdf5; color:var(--teal); }
+    .btn-del { background:#fef2f2; color:var(--red); }
+  </style>
+</head>
+<body>
+  <div class="wrap" id="app">
+    <div class="hero">
+      <div>
+        <span class="badge">Vue 3 × Nginx × FastAPI · github.com/ai4energy/turtorials</span>
+        <h1 style="margin:8px 0 4px;font-size:24px;">Vue 3 网页 × Nginx 反代 × FastAPI 后端</h1>
+        <p style="margin:0;color:#475569;font-size:14px;">源码仓 <code>github.com/ai4energy/turtorials</code> · API 基址 <code>{{ apiBase || '同源 Nginx /api/' }}</code></p>
+      </div>
+      <div class="status-pill" id="health-pill">后端健康状态：<span id="health-text">{{ healthText }}</span></div>
+    </div>
+
+    <div class="card">
+      <div class="form-row">
+        <input id="task-input" v-model="newTitle" @keyup.enter="addTask" type="text" placeholder="输入新的学习任务，例如：完成 docker compose up -d 部署" />
+        <select id="task-cat" v-model="newCat">
+          <option value="Docker">Docker</option>
+          <option value="FastAPI">FastAPI</option>
+          <option value="Vue3">Vue3</option>
+          <option value="Nginx">Nginx</option>
+          <option value="WSL">WSL</option>
+        </select>
+        <button id="submit-btn" class="primary" @click="addTask">添加任务</button>
+      </div>
+      <div class="list" id="task-list">
+        <div v-for="it in tasks" :key="it.id" :class="['item', { done: it.done }]">
+          <div>
+            <span class="cat">{{ it.category }}</span>
+            <span class="ttl">{{ it.title }}</span>
+          </div>
+          <div class="actions">
+            <button class="btn-ok" @click="toggleTask(it.id)">{{ it.done ? '已完成' : '标记完成' }}</button>
+            <button class="btn-del" @click="deleteTask(it.id)">删除</button>
+          </div>
+        </div>
+      </div>
+    </div>
+  </div>
+
+  <script src="./vue.global.prod.js"></script>
+  <script>
+    const { createApp, ref, onMounted } = Vue;
+    const isLocalSplit = window.location.port === '5173' || window.location.protocol === 'file:';
+    const API_BASE = isLocalSplit ? 'http://127.0.0.1:8000' : '';
+
+    createApp({
+      setup() {
+        const tasks = ref([]);
+        const healthText = ref('检测中...');
+        const newTitle = ref('');
+        const newCat = ref('Docker');
+        const apiBase = ref(API_BASE);
+
+        async function loadAll() {
+          try {
+            const h = await fetch(`${API_BASE}/api/health`).then(r => r.json());
+            healthText.value = h.status === 'ok' ? `正常 (${h.service})` : '异常';
+            const d = await fetch(`${API_BASE}/api/tasks`).then(r => r.json());
+            tasks.value = d.items || [];
+          } catch (e) {
+            healthText.value = '离线演示模式';
+            if (!tasks.value.length) {
+              tasks.value = [
+                { id: 1, title: '设置 WSL root 密码并验证 apt 部署 Nginx', category: 'Linux服务', done: true },
+                { id: 2, title: '用 Docker Compose 拉起 FastAPI + Vue 3 双容器', category: '容器编排', done: false }
+              ];
+            }
+          }
+        }
+
+        async function addTask() {
+          const title = newTitle.value.trim();
+          if (!title) return;
+          try {
+            await fetch(`${API_BASE}/api/tasks`, {
+              method: 'POST',
+              headers: { 'Content-Type': 'application/json' },
+              body: JSON.stringify({ title, category: newCat.value })
+            });
+            newTitle.value = '';
+            await loadAll();
+          } catch (e) {
+            tasks.value.push({ id: Date.now(), title, category: newCat.value, done: false });
+            newTitle.value = '';
+          }
+        }
+
+        async function toggleTask(id) {
+          try {
+            await fetch(`${API_BASE}/api/tasks/${id}/toggle`, { method: 'POST' });
+            await loadAll();
+          } catch (e) {
+            tasks.value = tasks.value.map(t => t.id === id ? { ...t, done: !t.done } : t);
+          }
+        }
+
+        async function deleteTask(id) {
+          try {
+            await fetch(`${API_BASE}/api/tasks/${id}`, { method: 'DELETE' });
+            await loadAll();
+          } catch (e) {
+            tasks.value = tasks.value.filter(t => t.id !== id);
+          }
+        }
+
+        onMounted(loadAll);
+        return { tasks, healthText, newTitle, newCat, apiBase, addTask, toggleTask, deleteTask };
+      }
+    }).mount('#app');
+  </script>
+</body>
+</html>

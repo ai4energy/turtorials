@@ -1,0 +1,18 @@
+services:
+  backend:
+    build:
+      context: ../unit-03-03-dockerfile-fastapi
+    container_name: turtorials_compose_backend
+    restart: unless-stopped
+    expose:
+      - "8000"
+
+  gateway:
+    image: nginx:alpine
+    container_name: turtorials_compose_gateway
+    depends_on:
+      - backend
+    ports:
+      - "8082:80"
+    volumes:
+      - ../unit-03-02-docker-basics/html:/usr/share/nginx/html:ro

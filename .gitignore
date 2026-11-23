@@ -1,0 +1,9 @@
+.venv/
+__pycache__/
+*.pyc
+node_modules/
+_tmp_vue/
+.env
+*.mp4
+*.wav
+.DS_Store
