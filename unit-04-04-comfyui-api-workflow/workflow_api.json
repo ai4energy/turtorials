@@ -1,0 +1,8 @@
+{
+  "1": {
+    "class_type": "Note",
+    "inputs": {
+      "text": "API format JSON: node ID keys + class_type + inputs (replace with fp8/GGUF --lowvram graph)"
+    }
+  }
+}

@@ -1,0 +1,68 @@
+# 单卡 WSL2 原子基座 Compose 示范（16 GB 显存通过 profile 分时拉起）
+# 注：生产多卡环境（如 4x RTX 5090）使用同类 YAML 锚点扩展多实例，本教学包仅单卡安全演示。
+
+x-common-env: &common-env
+  HF_HUB_OFFLINE: "1"
+  TZ: Asia/Shanghai
+
+services:
+  voice:
+    image: python:3.11-slim
+    container_name: demo-single-voice
+    profiles: ["voice"]
+    ports:
+      - "18110:8110"
+    environment:
+      <<: *common-env
+      VOICE_API_TOKEN: ${VOICE_API_TOKEN:-demo-local-token}
+    volumes:
+      - ${MODELS_DIR:-./models}:/models:ro
+    networks:
+      - aigc-single-net
+
+  vlm-7b:
+    image: vllm/vllm-openai:latest
+    container_name: demo-single-vlm-7b
+    profiles: ["vlm"]
+    ports:
+      - "18120:8000"
+    environment:
+      <<: *common-env
+      VLLM_API_KEY: ${VLLM_API_KEY:-demo-local-key}
+    volumes:
+      - ${MODELS_DIR:-./models}:/models:ro
+    command: ["--model", "/models/vl/qwen2.5-vl-7b", "--max-model-len", "32768"]
+    deploy:
+      resources:
+        reservations:
+          devices:
+            - driver: nvidia
+              count: 1
+              capabilities: [gpu]
+    networks:
+      - aigc-single-net
+
+  comfyui:
+    image: pytorch/pytorch:2.4.0-cuda12.4-cudnn9-runtime
+    container_name: demo-single-comfyui
+    profiles: ["comfyui"]
+    ports:
+      - "18130:8130"
+    environment:
+      <<: *common-env
+      VRAM_MODE: lowvram
+    volumes:
+      - ${MODELS_DIR:-./models}:/models:ro
+    deploy:
+      resources:
+        reservations:
+          devices:
+            - driver: nvidia
+              count: 1
+              capabilities: [gpu]
+    networks:
+      - aigc-single-net
+
+networks:
+  aigc-single-net:
+    driver: bridge
